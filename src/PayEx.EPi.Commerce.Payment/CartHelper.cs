@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Web;
@@ -104,7 +105,7 @@ namespace PayEx.EPi.Commerce.Payment
             foreach (LineItem lineItem in orderForm.LineItems)
             {
                 orderLines.Add(new OrderLine(result.OrderRef.ToString(), lineItem.CatalogEntryId, lineItem.DisplayName, (int)lineItem.Quantity,
-                    lineItem.ExtendedPrice.RoundToInt(), GetVatAmount(lineItem), GetVatPercentage(lineItem)));
+                    GetAmountIncludingVat(lineItem).RoundToInt(), GetVatAmount(lineItem), GetVatPercentage(lineItem)));
             }
 
             decimal shippingVatPercentage = GetShippingVatPercentage();
@@ -112,9 +113,14 @@ namespace PayEx.EPi.Commerce.Payment
             {
                 decimal shippingVatAmount = cart.ShippingTotal * (shippingVatPercentage / 100);
                 orderLines.Add(new OrderLine(result.OrderRef.ToString(), string.Empty, GetShippingMethodName(shipment), 1,
-                    cart.ShippingTotal.RoundToInt(), shippingVatAmount, shippingVatPercentage));
+                    (cart.ShippingTotal + shippingVatAmount).RoundToInt(), shippingVatAmount, shippingVatPercentage));
             }
             return orderLines;
+        }
+
+        internal static decimal GetAmountIncludingVat(LineItem lineItem)
+        {
+            return lineItem.ExtendedPrice + GetVatAmount(lineItem);
         }
 
         public static List<LineItem> GetLineItems(PayExPayment payExPayment)
@@ -129,16 +135,24 @@ namespace PayEx.EPi.Commerce.Payment
         internal static decimal GetVatAmount(LineItem lineItem)
         {
             var vatObject = lineItem["LineItemVatAmount"];
-            if (vatObject != null)
-                return (decimal)vatObject;
+            var decimalObject = vatObject as decimal?;
+            if (decimalObject.HasValue)
+                return decimalObject.Value;
+            var str = vatObject as string;
+            if (str != null)
+                return decimal.Parse(str, CultureInfo.InvariantCulture);
             return 0;
         }
 
         internal static decimal GetVatPercentage(LineItem lineItem)
         {
             var vatPercentObject = lineItem["LineItemVatPercentage"];
-            if (vatPercentObject != null)
-                return (decimal)vatPercentObject;
+            var decimalObject = vatPercentObject as decimal?;
+            if (decimalObject.HasValue)
+                return decimalObject.Value;
+            var str = vatPercentObject as string;
+            if (str != null)
+                return decimal.Parse(str, CultureInfo.InvariantCulture);
             return 0;
         }
 
